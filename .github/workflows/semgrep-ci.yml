@@ -1,4 +1,4 @@
-name: Semgrep Scan
+name: Semgrep Scan - Improved
 
 on:
   pull_request: {}
@@ -10,26 +10,37 @@ permissions:
 
 jobs:
   semgrep:
-    name: semgrep-oss/scan
+    name: Run Semgrep
     runs-on: ubuntu-latest
+    permissions: read-all
 
     container:
       image: semgrep/semgrep
 
-    if: (github.actor != 'dependabot[bot]')
+    if: github.actor != 'dependabot[bot]'
     steps:
       - uses: actions/checkout@v4
-      - run: semgrep scan --config auto --json > semgrep-output.json
+
+      - name: Get list of changed files
+        id: changed-files
+        uses: tj-actions/changed-files@v44
+
+      - name: Run Semgrep
+        run: |
+          echo "Changed files: ${{ steps.changed-files.outputs.all_changed_files }}"
+          semgrep scan --verbose --json ${{ steps.changed-files.outputs.all_changed_files }} -o semgrep-output.json
       - name: Upload semgrep output
         uses: actions/upload-artifact@v4
         with:
           name: my-semgrep-artifact
           path: semgrep-output.json
+
   annotate:
     name: Annotate Semgrep Results
     needs: semgrep
     uses: seceng-sandbox/workflows/.github/workflows/semgrep-annotate.yml@main
     with:
       artifact_name: my-semgrep-artifact
+      fail_on_findings: true
     permissions:
       contents: read
